@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Kagome検査アプリ
+Name[ja]=Kagome検査アプリ
+Comment=Baumer産業カメラ × AnomalyDINO 検査アプリケーション
+Comment[ja]=Baumer産業カメラ × AnomalyDINO 検査アプリケーション
+Exec=python3 /home/user/codes/Kagome-Inspection-App/main.py
+Icon=/home/user/codes/Kagome-Inspection-App/media/AnomalyDINO.png
+Path=/home/user/codes/Kagome-Inspection-App
+Terminal=false
+StartupNotify=true
+Categories=Application;Development;

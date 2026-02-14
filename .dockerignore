@@ -1,0 +1,57 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# 仮想環境
+venv/
+.venv/
+env/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ログ・出力ファイル
+logs/
+logs_setting/
+analyze/
+captured_images/
+*.log
+
+# キャッシュ
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ドキュメント
+docs/
+*.md
+!requirements.txt
+
+# ホイールファイル（明示的にコピーするため除外しない）
+# baumer_neoapi*.whl
+
+# その他
+*.bmp
+*.png
+*.jpg
+*.jpeg
+prompt.md

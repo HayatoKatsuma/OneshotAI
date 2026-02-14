@@ -1,0 +1,136 @@
+{
+  "TriggerMode": "Off",
+  "AcquisitionMode": "Continuous", 
+  "ExposureMode": "Timed",
+  
+  "Width": 1024,
+  "Height": 1024,
+  "OffsetX": 496,
+  "OffsetY": 300,
+  
+  "ExposureTime": 10000,
+  "Gain": 10,
+  "ExposureAuto": "Off",
+  "GainAuto": "Off",
+  "ExposureAutoMinValue": 15,
+  "ExposureAutoMaxValue": 250000,
+  "GainAutoMinValue": 1,
+  "GainAutoMaxValue": 1,
+  
+  "AcquisitionFrameRateEnable": true,
+  "AcquisitionFrameRate": 100,
+  
+  "PixelFormat": "BayerRG8",
+  
+  "BinningSelector": "Region0", 
+  "BinningHorizontal": 1,
+  "BinningVertical": 1,
+  "BinningHorizontalMode": "Sum",
+  "BinningVerticalMode": "Sum",
+  
+  "BalanceWhiteAuto": "Off",
+  "ColorTransformationAuto": "Continuous",
+  "ColorTransformationEnable": false,
+  "ColorTransformationFactoryListSelector": "OptimizedMatrixFor6500K",
+  "ColorTransformationOutputColorSpace": "sRGB Gamma 1",
+  "ColorTransformationValueSelector": "Gain00",
+  "ColorTransformationValue": 1.23828,
+  "ColorTransformationResetToFactoryList": "Done",
+  
+  "Gamma": 1.0,
+  "LUTEnable": false,
+  "LUTSelector": "Luminance",
+  "LUTContent": "Gamma",
+  "LUTIndex": 0,
+  "LUTValue": 0,
+  
+  "ReadoutMode": "Overlapped",
+  "SensorShutterMode": "Global",
+  
+  "BrightnessAutoPriority": "ExposureAuto",
+  "BrightnessAutoNominalValue": 50,
+  
+  "GevSCPSPacketSize": 1500,
+  "GevSCPSDoNotFragment": true,
+  "EnergyEfficientEthernetEnable": true,
+  
+  "TestPattern": "Off",
+  "ReverseX": false,
+  "ReverseY": false,
+  "BlackLevelSelector": "All",
+  "BlackLevel": 0,
+  "DefectPixelCorrection": true,
+  "ChunkModeActive": false,
+
+  "TriggerSource": "All",
+  "TriggerActivation": "RisingEdge",
+  "TriggerDelay": 0,
+  "TriggerSelector": "FrameStart",
+  "TriggerOverlap": "ReadOut",
+  
+  "TimerSelector": "Timer1",
+  "TimerTriggerSource": "Off",
+  "TimerTriggerActivation": "RisingEdge",
+  "TimerDelay": 0,
+  "TimerDuration": 10,
+  
+  "LineSelector": "Line0",
+  "LineMode": "Input",
+  "LineInverter": false,
+  "LineSource": "Off",
+  "LineDebouncerHighTimeAbs": 0,
+  "LineDebouncerLowTimeAbs": 0,
+  "LineStatus": 0,
+  "LineStatusAll": 6,
+  
+  "UserOutputSelector": "UserOutput1",
+  "UserOutputValue": 0,
+  "UserOutputValueAll": 0,
+  
+  "AutoFeatureRegionSelector": "BrightnessAuto",
+  "AutoFeatureRegionReference": "Region0",
+  "AutoFeatureRegionMode": "Off",
+  "AutoFeatureOffsetX": 0,
+  "AutoFeatureOffsetY": 0,
+  "AutoFeatureWidth": 464,
+  "AutoFeatureHeight": 662,
+  
+  "SequencerMode": "Off",
+  "SequencerConfigurationMode": "Off",
+  "SequencerFeatureSelector": "ExposureTime",
+  "SequencerFeatureEnable": true,
+  
+  "CounterSelector": "Counter1",
+  "CounterEventSource": "Off",
+  "CounterEventActivation": "RisingEdge",
+  "CounterResetSource": "Off",
+  "CounterResetActivation": "RisingEdge",
+  "CounterDuration": 1,
+  "CounterValue": 0,
+  "CounterValueAtReset": 0,
+  "CounterReset": "Done",
+  
+  "ActionSelector": 1,
+  "ActionGroupKey": "0x0",
+  "ActionGroupMask": "0x0",
+  
+  "EventSelector": "GigEVisionHeartbeatTimeOut",
+  "EventNotification": "Off",
+  
+  "ChunkSelector": "Image",
+  "ChunkEnable": false,
+  
+  "UserSetSelector": "Default",
+  "UserSetDefault": "UserSet1",
+  "UserSetFeatureSelector": "AcquisitionFrameCount",
+  "UserSetFeatureEnable": true,
+  "UserSetDataEnable": false,
+  "UserSetStartAddressSelector": 1,
+  
+  "CustomDataSelector": 0,
+  "CustomData": "0xff",
+  "CustomDataConfigurationMode": "Off",
+  
+  "ImageDataEnable": false,
+  "ShortExposureTimeEnable": false
+}

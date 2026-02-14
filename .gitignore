@@ -1,0 +1,17 @@
+.claude
+lib
+
+Anomaly_Detection/logs/
+Anomaly_Detection/logs_setting/
+Anomaly_Detection/master/
+
+Segmentation/defect_library/
+Segmentation/logs/
+
+**/__pycache__/**
+
+**/*.pth
+**/*.bmp
+**/*.wav
+
+prompt.md

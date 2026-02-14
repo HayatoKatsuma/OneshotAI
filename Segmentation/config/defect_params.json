@@ -1,0 +1,25 @@
+{
+  "default_confidence_threshold": 0.3,
+  "default_min_area": 100,
+  "display_size": 640,
+  "csv_output_dir": "Segmentation/logs",
+  "overlay_alpha": 0.5,
+  "defect_library_dir": "Segmentation/defect_library",
+  "sam3_resolution": 1008,
+  "defect_colors": {
+    "scratch": [255, 0, 0],
+    "hole": [0, 255, 0],
+    "stain": [0, 0, 255],
+    "crack": [255, 255, 0],
+    "dent": [255, 0, 255],
+    "other": [128, 128, 128]
+  },
+  "defect_display_names": {
+    "scratch": "傷",
+    "hole": "穴",
+    "stain": "汚れ",
+    "crack": "ひび",
+    "dent": "へこみ",
+    "other": "その他"
+  }
+}

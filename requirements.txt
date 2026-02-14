@@ -1,0 +1,23 @@
+opencv-python
+matplotlib
+Pillow
+numpy>=2.0 # faiss-cpuがnumpy 2.0以上を要求
+scipy>=1.13
+scikit-learn
+tqdm
+tifffile
+argparse
+PyYAML
+pandas
+jupyter
+TkEasyGUI
+commentjson
+
+# SAM3関連（欠陥検出・計数機能）
+huggingface_hub>=0.20.0  # HuggingFaceからモデルチェックポイントをダウンロード
+iopath>=0.1.10           # ファイルパス管理（SAM3内部で使用）
+scikit-image>=0.22.0     # 連結成分解析（欠陥検出で使用）
+setuptools>=69.0.0       # pkg_resources（SAM3内部で使用）
+einops>=0.7.0            # テンソル操作（SAM3のRoPE実装で使用）
+decord                   # 動画読み込み（SAM3内部インポートで必要）
+pycocotools              # COCOデータセット処理（SAM3内部で使用）
