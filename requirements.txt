@@ -1,7 +1,7 @@
 opencv-python
 matplotlib
 Pillow
-numpy>=2.0 # faiss-cpuがnumpy 2.0以上を要求
+numpy>=1.26,<2  # SAM3がnumpy<2を要求
 scipy>=1.13
 scikit-learn
 tqdm

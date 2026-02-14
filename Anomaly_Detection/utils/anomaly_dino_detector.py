@@ -12,6 +12,7 @@ import numpy as np
 import torch
 import faiss
 import cv2
+from scipy.ndimage import gaussian_filter
 
 from Anomaly_Detection.src.backbones import get_model
 
@@ -48,10 +49,27 @@ class AnomalyDINODetector:
         # master feature
         self._master_feat: np.ndarray = np.load(master_feat_path)          # shape (N, D)
 
-        # K-NN index
+        # K-NN index（GPU利用可能ならGPU版を使用、失敗時はCPUにフォールバック）
         faiss.normalize_L2(self._master_feat)
-        self._knn = faiss.IndexFlatL2(self._master_feat.shape[1])
-        self._knn.add(self._master_feat)
+        dim = self._master_feat.shape[1]
+        cpu_index = faiss.IndexFlatL2(dim)
+        cpu_index.add(self._master_feat)
+
+        # GPUが利用可能かチェックしてGPUインデックスに変換
+        if faiss.get_num_gpus() > 0:
+            try:
+                self._gpu_res = faiss.StandardGpuResources()
+                self._knn = faiss.index_cpu_to_gpu(self._gpu_res, 0, cpu_index)
+                # GPU動作確認のためダミー検索を実行
+                dummy = self._master_feat[:1].copy()
+                self._knn.search(dummy, 1)
+                print(f"FAISS: GPUインデックスを使用 (GPU 0)")
+            except Exception as e:
+                print(f"FAISS: GPU初期化失敗 ({e}), CPUにフォールバック")
+                self._knn = cpu_index
+        else:
+            self._knn = cpu_index
+            print("FAISS: CPUインデックスを使用")
 
         self._threshold = threshold
         self._roi_rel = roi_rel
@@ -64,15 +82,18 @@ class AnomalyDINODetector:
 
     # ------------------------------------------------------------------ #
     @torch.no_grad()
-    def _score_single(self, frame: np.ndarray) -> float:
-        """単一フレームの異常スコア"""
+    def _score_single(
+        self, frame: np.ndarray
+    ) -> Tuple[float, np.ndarray, Tuple[int, int]]:
+        """単一フレームの異常スコア、パッチ距離、グリッドサイズを返す"""
         # フレームはBaumerCameraクラスでRGB変換済み
-        tensor, _ = self._model.prepare_image(frame)
+        tensor, grid_size = self._model.prepare_image(frame)
         feat = self._model.extract_features(tensor)
         faiss.normalize_L2(feat)
         dist, _ = self._knn.search(feat, 1)          # 最近傍距離
         dist = dist / 2.0
-        return float(np.mean(sorted(dist, reverse=True)[: max(1, int(len(dist) * 0.01))]))
+        score = float(np.mean(sorted(dist.flatten(), reverse=True)[: max(1, int(len(dist) * 0.01))]))
+        return score, dist.reshape(grid_size), grid_size
 
     # ------------------------------------------------------------------ #
     def _load_master_hue(self) -> float:
@@ -135,26 +156,57 @@ class AnomalyDINODetector:
         d_norm = min(d / 2.0, 1.0)  # 最大1.0に規格化
         return float(d_norm)
 
-    def inspect_min(self, frames: List[np.ndarray]) -> Tuple[float, np.ndarray, str]:
-        """フレーム列の最小DINOスコアと、そのフレーム、OK/NG を返却（Hue考慮済み）"""
+    def _create_heatmap_overlay(
+        self,
+        image: np.ndarray,
+        patch_dists: np.ndarray,
+        alpha: float = 0.5,
+    ) -> np.ndarray:
+        """パッチ距離からヒートマップオーバーレイ画像を生成"""
+        h, w = image.shape[:2]
+        # パッチ距離を画像サイズにリサイズ
+        heatmap = cv2.resize(patch_dists.astype(np.float32), (w, h), interpolation=cv2.INTER_LINEAR)
+        heatmap = gaussian_filter(heatmap, sigma=4)
+        # 正規化 (0-1)
+        heatmap_min, heatmap_max = heatmap.min(), heatmap.max()
+        if heatmap_max - heatmap_min > 1e-8:
+            heatmap = (heatmap - heatmap_min) / (heatmap_max - heatmap_min)
+        else:
+            heatmap = np.zeros_like(heatmap)
+        # カラーマップ適用 (JET: 青→緑→赤)
+        heatmap_colored = cv2.applyColorMap((heatmap * 255).astype(np.uint8), cv2.COLORMAP_JET)
+        heatmap_colored = cv2.cvtColor(heatmap_colored, cv2.COLOR_BGR2RGB)
+        # オーバーレイ
+        overlay = cv2.addWeighted(image, 1 - alpha, heatmap_colored, alpha, 0)
+        return overlay
+
+    def inspect_min(
+        self, frames: List[np.ndarray]
+    ) -> Tuple[float, np.ndarray, np.ndarray, str]:
+        """フレーム列の最小DINOスコアと、そのフレーム、ヒートマップ付き画像、OK/NG を返却"""
         best_dino = float("inf")
         best_frame: np.ndarray | None = None
+        best_patch_dists: np.ndarray | None = None
 
-        # 1. Find frame with minimum DINO score
+        # 1. 最小DINOスコアのフレームを探す
         for f in frames:
-            s = self._score_single(f)
-            if s < best_dino:
-                best_dino = s
+            score, patch_dists, _ = self._score_single(f)
+            if score < best_dino:
+                best_dino = score
                 best_frame = f
+                best_patch_dists = patch_dists
 
-        if best_frame is None:
+        if best_frame is None or best_patch_dists is None:
             dummy = np.zeros((100, 100, 3), np.uint8)
-            return float("inf"), dummy, "NG"
+            return float("inf"), dummy, dummy, "NG"
 
-        # 2. Calculate Hue score for the best frame
+        # 2. ヒートマップ画像を生成
+        heatmap_image = self._create_heatmap_overlay(best_frame, best_patch_dists)
+
+        # 3. Hueスコアを計算
         hue_score = self._calculate_hue_score(best_frame, self._master_hue_deg)
-        
-        # 3. Calculate final score: min_dino_score + hue_weight * hue_score
+
+        # 4. 最終スコア: min_dino_score + hue_weight * hue_score
         final_score = best_dino + self._hue_weight * hue_score
-        
-        return final_score, best_frame, ("OK" if final_score < self._threshold else "NG")
+
+        return final_score, best_frame, heatmap_image, ("OK" if final_score < self._threshold else "NG")

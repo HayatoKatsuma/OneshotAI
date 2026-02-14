@@ -198,7 +198,17 @@ class AnomalyInspectionApp:
         指定製品の設定とマスター画像を読み込み
         """
         pdir = self.master_dir / prod
-        master_bgr = imread_jp(pdir / "master.bmp")
+
+        # master.bmpがあれば使用、なければ最初の.bmpファイルを使用
+        master_bmp_path = pdir / "master.bmp"
+        if not master_bmp_path.exists():
+            bmp_files = sorted(pdir.glob("*.bmp"))
+            if bmp_files:
+                master_bmp_path = bmp_files[0]
+            else:
+                raise FileNotFoundError(f"マスター画像が見つかりません: {pdir}")
+
+        master_bgr = imread_jp(master_bmp_path)
         self.master_img = cv2.cvtColor(master_bgr, cv2.COLOR_BGR2RGB)
         self.master_padded = pad_to_square(self.master_img, self.display_px)
 
@@ -720,7 +730,7 @@ class AnomalyInspectionApp:
             self.camera.cam.StopStreaming()
             return frame
 
-    def _run_inspection(self, frame: np.ndarray) -> Tuple[float, np.ndarray, str]:
+    def _run_inspection(self, frame: np.ndarray) -> Tuple[float, np.ndarray, np.ndarray, str]:
         """
         1枚の画像に対して推論を実行
 
@@ -728,14 +738,14 @@ class AnomalyInspectionApp:
             frame: 検査対象の画像（RGB形式）
 
         Returns:
-            Tuple[float, np.ndarray, str]: (スコア, 画像, 判定結果)
+            Tuple[float, np.ndarray, np.ndarray, str]: (スコア, 画像, ヒートマップ, 判定結果)
         """
         start_time = time.time()
         # inspect_minはリストを受け取るため、1枚の画像をリストに
-        score, img, res = self.detector.inspect_min([frame])
+        score, img, heatmap, res = self.detector.inspect_min([frame])
         inference_time = time.time() - start_time
         print(f"推論時間: {inference_time:.3f}s, スコア: {score:.4f}, 結果: {res}")
-        return score, img, res
+        return score, img, heatmap, res
 
     # -------------------------------------------------------------------------
     # UI更新・ログ管理
@@ -756,7 +766,7 @@ class AnomalyInspectionApp:
                 bmp_path.unlink()
 
     def _update_inspection_ui(
-        self, win: eg.Window, score: float, img: np.ndarray, res: str
+        self, win: eg.Window, score: float, img: np.ndarray, heatmap: np.ndarray, res: str
     ):
         """
         検査UI更新メソッド - 検査結果をメインウィンドウに反映
@@ -765,10 +775,11 @@ class AnomalyInspectionApp:
             win (eg.Window): 更新対象のウィンドウ
             score (float): 異常スコア
             img (np.ndarray): 検査画像（RGB形式）
+            heatmap (np.ndarray): ヒートマップ付き画像（RGB形式）
             res (str): 判定結果 ("OK" or "NG")
         """
-        # 画像を表示用にパディング
-        padded_img = pad_to_square(img, self.display_px)
+        # ヒートマップ画像を表示用にパディング
+        padded_img = pad_to_square(heatmap, self.display_px)
         img_png = self._to_png_bytes(padded_img)
 
         win["-LIVE-"].update(data=img_png)
@@ -794,9 +805,9 @@ class AnomalyInspectionApp:
             # ログ保存
             self._manage_log_storage()
             ts = _dt.datetime.now().strftime("%Y%m%d%H%M%S")
-            # RGB形式の画像をBGR形式に変換してから保存
-            img_bgr = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(str(self.log / f"{ts}.bmp"), img_bgr)
+            # ヒートマップ画像をBGR形式に変換してから保存
+            heatmap_bgr = cv2.cvtColor(heatmap, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(str(self.log / f"{ts}.bmp"), heatmap_bgr)
             (self.log / f"{ts}.txt").write_text(f"score:{score:.6f}")
 
     # -------------------------------------------------------------------------
@@ -895,10 +906,10 @@ class AnomalyInspectionApp:
                     win.refresh()
 
                     # 推論
-                    score, img, res = self._run_inspection(frame)
+                    score, img, heatmap, res = self._run_inspection(frame)
 
                     # UI更新
-                    self._update_inspection_ui(win, score, img, res)
+                    self._update_inspection_ui(win, score, img, heatmap, res)
                 else:
                     win["-RESULT-"].update("結果: 撮影失敗", text_color="red")
 
@@ -927,10 +938,10 @@ class AnomalyInspectionApp:
                     win.refresh()
 
                     # 推論
-                    score, img, res = self._run_inspection(frame)
+                    score, img, heatmap, res = self._run_inspection(frame)
 
                     # UI更新
-                    self._update_inspection_ui(win, score, img, res)
+                    self._update_inspection_ui(win, score, img, heatmap, res)
 
         # カメラクリーンアップ
         self._cleanup_camera()

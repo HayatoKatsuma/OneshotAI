@@ -53,24 +53,34 @@ class MasterGeneratorApp:
             return False
 
     def get_available_products(self) -> List[str]:
-        """masterフォルダから利用可能な製品一覧を取得"""
+        """masterフォルダから利用可能な製品一覧を取得（1つ以上の.bmpがあるフォルダ）"""
         products = []
 
         if not self.master_dir.exists():
             return products
 
         for folder in self.master_dir.iterdir():
-            if folder.is_dir() and (folder / "master.bmp").exists():
-                products.append(folder.name)
+            if folder.is_dir():
+                # フォルダ内に1つ以上の.bmpファイルがあれば対象
+                bmp_files = list(folder.glob("*.bmp"))
+                if bmp_files:
+                    products.append(folder.name)
 
         return sorted(products)
 
     def create_anomaly_dino_features(self, product_name: str, model_params: Dict) -> bool:
-        """anomalyDINOの特徴量ファイル(master.npy)を生成"""
+        """anomalyDINOの特徴量ファイル(master.npy)を生成（複数画像対応）"""
         try:
             master_folder = self.master_dir / product_name
-            master_bmp_path = master_folder / "master.bmp"
             npy_path = master_folder / "master.npy"
+
+            # フォルダ内の全.bmpファイルを取得
+            bmp_files = sorted(master_folder.glob("*.bmp"))
+            if not bmp_files:
+                print(f"No BMP files found in {master_folder}")
+                return False
+
+            print(f"Found {len(bmp_files)} BMP files for {product_name}")
 
             # 既存ファイルがあっても上書きする
             if npy_path.exists():
@@ -87,17 +97,23 @@ class MasterGeneratorApp:
                 feat_layer=model_params["feat_layer"],
             )
 
-            # 画像読み込み
-            master_image = cv2.cvtColor(
-                cv2.imread(str(master_bmp_path), cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB
-            )
+            # 全画像から特徴量を抽出して連結
+            all_features = []
+            for bmp_path in bmp_files:
+                print(f"  Processing: {bmp_path.name}")
+                master_image = cv2.cvtColor(
+                    cv2.imread(str(bmp_path), cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB
+                )
+                master_tensor, _ = model.prepare_image(master_image)
+                feature = model.extract_features(master_tensor)
+                all_features.append(feature)
 
-            # 特徴量抽出
-            master_tensor, _ = model.prepare_image(master_image)
-            feature = model.extract_features(master_tensor)
+            # 全特徴量を連結
+            concatenated_features = np.concatenate(all_features, axis=0)
+            print(f"  Total patches: {concatenated_features.shape[0]} (from {len(bmp_files)} images)")
 
             # 保存
-            np.save(npy_path, feature)
+            np.save(npy_path, concatenated_features)
             print(f"Successfully created: {npy_path}")
             return True
 
@@ -135,15 +151,16 @@ class MasterGeneratorApp:
         roi_rel: Tuple[float, float, float, float],
         sat_thresh: int,
     ) -> float:
-        """マスター側の平均Hue（度）を、マスター内の全BMPから平均して求める"""
-        bmp_paths = [p for p in master_folder_path.rglob("*.bmp")]
+        """マスター側の平均Hue（度）を、マスター内の全BMPから円環平均で求める"""
+        bmp_paths = sorted(master_folder_path.glob("*.bmp"))
         if not bmp_paths:
             print(
                 f"[WARN] No BMP found in master folder for Hue computation: {master_folder_path}"
             )
             return float("nan")
 
-        means = []
+        # 各画像のHue平均値を収集
+        hue_means = []
         for p in bmp_paths:
             img_bgr = cv2.imread(str(p), cv2.IMREAD_COLOR)
             if img_bgr is None:
@@ -154,13 +171,16 @@ class MasterGeneratorApp:
             sat = hsv[:, :, 1].astype(np.float32)
             mask = sat > float(sat_thresh)
             if np.any(mask):
-                means.append(self._circular_mean_deg(hue[mask]))
-        if not means:
+                hue_means.append(self._circular_mean_deg(hue[mask]))
+
+        if not hue_means:
             print(
                 f"[WARN] Failed to compute master hue (no valid pixels): {master_folder_path}"
             )
             return float("nan")
-        return float(np.mean(means))
+
+        # 複数画像のHue平均値を円環平均で統合
+        return self._circular_mean_deg(np.array(hue_means))
 
     def create_master_hue(self, product_name: str, model_params: Dict) -> bool:
         """master_hue.txtファイルを生成"""

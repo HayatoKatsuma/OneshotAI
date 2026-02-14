@@ -86,10 +86,28 @@ RUN pip3 install --no-cache-dir \
     torchaudio \
     --index-url https://download.pytorch.org/whl/cu128
 
-# FAISS-CPU のインストール
-# Note: faiss-gpuはPython 3.12用のwheelが提供されていないためCPU版を使用
-# IndexFlatL2のみの使用であればCPU版でも十分高速
-RUN pip3 install --no-cache-dir faiss-cpu
+# CMakeを最新版に更新（faissビルドにCMake 3.24.0以上が必要）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    apt-transport-https ca-certificates gnupg && \
+    wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - > /usr/share/keyrings/kitware-archive-keyring.gpg && \
+    echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ jammy main' > /etc/apt/sources.list.d/kitware.list && \
+    apt-get update && apt-get install -y --no-install-recommends cmake && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# FAISS-GPU のソースからビルド（Blackwell GPU対応）
+# faiss-gpu-cu12はBlackwell (CC 12.0) 未対応のため、ソースからビルド
+RUN git clone --depth 1 https://github.com/facebookresearch/faiss.git /tmp/faiss && \
+    cd /tmp/faiss && \
+    cmake -B build . \
+        -DFAISS_ENABLE_GPU=ON \
+        -DFAISS_ENABLE_PYTHON=ON \
+        -DBUILD_TESTING=OFF \
+        -DCMAKE_CUDA_ARCHITECTURES="120" \
+        -DPython_EXECUTABLE=$(which python3) && \
+    make -C build -j$(nproc) faiss swigfaiss && \
+    cd build/faiss/python && \
+    pip3 install . && \
+    rm -rf /tmp/faiss
 
 # 作業ディレクトリの設定
 WORKDIR /app

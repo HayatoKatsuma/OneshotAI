@@ -48,6 +48,7 @@ class AnomalyScoreCalculator:
         self.current_master_feat = None
         self.current_knn = None
         self.current_master_hue_deg: float = None  # 追加：マスター側の平均Hue（度）
+        self._gpu_res = None  # FAISS GPU用リソース
         self._init_model()
     
     def _init_model(self):
@@ -97,11 +98,28 @@ class AnomalyScoreCalculator:
         return None
     
     def load_master_features(self, master_npy_path: str):
-        """マスター特徴量の読み込み"""
+        """マスター特徴量の読み込み（GPU利用可能ならGPU版を使用、失敗時はCPUにフォールバック）"""
         self.current_master_feat = np.load(master_npy_path)
         faiss.normalize_L2(self.current_master_feat)
-        self.current_knn = faiss.IndexFlatL2(self.current_master_feat.shape[1])
-        self.current_knn.add(self.current_master_feat)
+        dim = self.current_master_feat.shape[1]
+        cpu_index = faiss.IndexFlatL2(dim)
+        cpu_index.add(self.current_master_feat)
+
+        # GPUが利用可能かチェックしてGPUインデックスに変換
+        if faiss.get_num_gpus() > 0:
+            try:
+                self._gpu_res = faiss.StandardGpuResources()
+                self.current_knn = faiss.index_cpu_to_gpu(self._gpu_res, 0, cpu_index)
+                # GPU動作確認のためダミー検索を実行
+                dummy = self.current_master_feat[:1].copy()
+                self.current_knn.search(dummy, 1)
+                print(f"FAISS: GPUインデックスを使用 (GPU 0)")
+            except Exception as e:
+                print(f"FAISS: GPU初期化失敗 ({e}), CPUにフォールバック")
+                self.current_knn = cpu_index
+        else:
+            self.current_knn = cpu_index
+            print("FAISS: CPUインデックスを使用")
 
     # ============ Hue 関連（保存・計算・スコア化） ============
     @staticmethod
