@@ -83,41 +83,29 @@ class DefectInspectionApp:
         eg.set_theme("clam")
 
     def _load_json(self, filename: str, use_segmentation_cfg: bool = False) -> Dict:
-        """設定ファイル読み込み"""
+        """設定ファイル読み込み（// コメント対応）"""
         cfg_dir = self.segmentation_cfg if use_segmentation_cfg else self.cfg
         path = cfg_dir / filename
         if not path.exists():
             return {}
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            lines = [line for line in f if not line.strip().startswith("//")]
+            return json.loads("".join(lines))
 
     def _initialize_camera(self) -> bool:
         """カメラを初期化"""
         if self.camera_ready:
             return True
 
-        try:
-            import importlib.util
-            spec = importlib.util.spec_from_file_location(
-                "baumer_camera", _project_root / "utils" / "baumer_camera.py"
-            )
-            baumer_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(baumer_module)
-            BaumerCamera = baumer_module.BaumerCamera
+        from utils.baumer_camera import BaumerCamera
 
-            print("カメラを初期化中...")
-            self.camera = BaumerCamera()
-            self.camera.apply_config(self.camera_params)
-            self.camera.cam.StartStreaming()
-            self.camera_ready = True
-            print("カメラ初期化完了")
-            return True
-
-        except Exception as e:
-            print(f"カメラ初期化エラー: {e}")
-            self.camera = None
-            self.camera_ready = False
-            return False
+        print("カメラを初期化中...")
+        self.camera = BaumerCamera()
+        self.camera.apply_config(self.camera_params)
+        self.camera.cam.StartStreaming()
+        self.camera_ready = True
+        print("カメラ初期化完了")
+        return True
 
     def _release_camera(self) -> None:
         """カメラを解放"""
@@ -142,28 +130,23 @@ class DefectInspectionApp:
             print("ライブラリが選択されていません")
             return False
 
-        try:
-            print("モデルを初期化中...")
-            debug_dir = self.csv_output_dir / "debug_images"
-            self.detector = DefectDetector(
-                self.library,
-                device="cuda",
-                debug_save_dir=str(debug_dir),
-            )
+        print("モデルを初期化中...")
+        debug_dir = self.csv_output_dir / "debug_images"
+        self.detector = DefectDetector(
+            self.library,
+            device="cuda",
+            debug_save_dir=str(debug_dir),
+            ref_padding_ratio=float(self.defect_params.get("ref_padding_ratio", 0.1)),
+        )
 
-            if preload:
-                print("モデルを事前ロード中...")
-                if not self.detector.preload_model():
-                    print("警告: モデルの事前ロードに失敗しました")
-                    return False
+        if preload:
+            print("モデルを事前ロード中...")
+            if not self.detector.preload_model():
+                print("警告: モデルの事前ロードに失敗しました")
+                return False
 
-            print("モデルの初期化完了")
-            return True
-
-        except Exception as e:
-            print(f"モデル初期化エラー: {e}")
-            self.detector = None
-            return False
+        print("モデルの初期化完了")
+        return True
 
     def _make_library_select_window(self) -> eg.Window:
         """ライブラリ選択画面"""
@@ -318,7 +301,7 @@ class DefectInspectionApp:
                 eg.Button("キャンセル", key="-CANCEL_TRIGGER-"),
             ],
         ]
-        return eg.Window("トリガー設定", layout, finalize=True, size=(500, 450))
+        return eg.Window("トリガー設定", layout, finalize=True, size=(500, 650))
 
     def _save_trigger_settings(self, values: Dict) -> bool:
         """
@@ -399,6 +382,10 @@ class DefectInspectionApp:
                     [eg.HSeparator()],
                     [eg.Text("登録欠陥クラス:", font=("Arial", 12))],
                     [eg.Listbox(type_summary_lines, key="-TYPE_SUMMARY-", size=(30, 5))],
+                    [eg.HSeparator()],
+                    [eg.Text("しきい値設定:", font=("Arial", 12))],
+                    *self._make_threshold_inputs(),
+                    [eg.Button("閾値を適用", key="-APPLY_THRESHOLDS-", size=(12, 1))],
                 ]),
             ],
             [eg.HSeparator()],
@@ -406,21 +393,25 @@ class DefectInspectionApp:
                 eg.Text("モード: 手動", key="-MODE_STATUS-", font=("Arial", 14), text_color="gray"),
                 eg.Button("手動モード", key="-MODE_MANUAL-", size=(10, 1)),
                 eg.Button("トリガーモード", key="-MODE_TRIGGER-", size=(12, 1)),
-                eg.Button("トリガー設定", key="-TRIGGER_SETTINGS-", size=(10, 1)),
+                
             ],
             [eg.HSeparator()],
             [
-                eg.Column([
-                    [
-                        eg.Button("撮像＆検出", key="-CAPTURE-", size=(12, 2)),
-                        eg.Button("画像読込", key="-LOAD_IMAGE-", size=(10, 2)),
-                        eg.Button("終了", key="-BACK-", size=(10, 2)),
-                    ],
-                ]),
+                eg.Text("トリガーモード:", font=("Arial", 12)),
+                eg.Button("トリガー設定", key="-TRIGGER_SETTINGS-", size=(10, 1))
             ],
+            [eg.HSeparator()],
+            [
+                eg.Text("手動モード:", font=("Arial", 12)),
+                eg.Button("撮像＆検出", key="-CAPTURE-", size=(12, 2)),
+                eg.Button("画像読込", key="-LOAD_IMAGE-", size=(10, 2)),
+                
+            ],
+            [eg.HSeparator()],
+            [eg.Button("終了", key="-BACK-", size=(10, 2))],
         ]
 
-        return eg.Window("欠陥検出・計数", layout, finalize=True, size=(1100, 950))
+        return eg.Window("欠陥検出・計数", layout, finalize=True, size=(1100, 1200))
 
     def _get_defect_type_summary(self) -> str:
         """欠陥タイプのサマリーテキストを生成（しきい値含む）"""
@@ -446,6 +437,22 @@ class DefectInspectionApp:
             lines.append(f" {defect_type.display_name} (閾値: {threshold:.2f})")
 
         return lines if lines else ["欠陥クラス未登録"]
+
+    def _make_threshold_inputs(self) -> list:
+        """欠陥タイプごとのしきい値入力欄を生成"""
+        rows = []
+        if not self.library:
+            return rows
+        for defect_type in self.library.defect_types.values():
+            rows.append([
+                eg.Text(f"{defect_type.display_name}:", size=(12, 1)),
+                eg.Input(
+                    f"{defect_type.confidence_threshold:.2f}",
+                    key=f"-THRESH_{defect_type.name}-",
+                    size=(8, 1),
+                ),
+            ])
+        return rows
 
     def _update_image_display(self, win: eg.Window, image: np.ndarray) -> None:
         """画像表示を更新"""
@@ -712,6 +719,26 @@ class DefectInspectionApp:
             # ----- トリガー設定 -----
             if ev == "-TRIGGER_SETTINGS-":
                 self._run_trigger_settings()
+
+            # ----- しきい値適用 -----
+            if ev == "-APPLY_THRESHOLDS-":
+                errors = []
+                for defect_type in self.library.defect_types.values():
+                    key = f"-THRESH_{defect_type.name}-"
+                    raw = vals.get(key, "").strip()
+                    try:
+                        new_val = float(raw)
+                    except ValueError:
+                        errors.append(f"{defect_type.display_name}: 無効な値 '{raw}'")
+                        continue
+                    defect_type.confidence_threshold = new_val
+                if errors:
+                    eg.popup_error("\n".join(errors))
+                else:
+                    # ライブラリを保存して永続化
+                    self.library.save()
+                    # 登録欠陥クラス表示を更新
+                    win["-TYPE_SUMMARY-"].update(self._get_defect_type_summary_lines())
 
             # ----- 撮像＆検出ボタン（手動モード時のみ）-----
             if ev == "-CAPTURE-" and not self.trigger_mode:

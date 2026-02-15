@@ -1,11 +1,21 @@
 {
+  // 欠陥検出の信頼度しきい値（0.0〜1.0）
   "default_confidence_threshold": 0.3,
+  // 欠陥と判定する最小面積（ピクセル数）
   "default_min_area": 100,
+  // GUI表示時の画像サイズ（ピクセル）
   "display_size": 640,
+  // 検査結果CSVの出力先ディレクトリ
   "csv_output_dir": "Segmentation/logs",
+  // 欠陥オーバーレイの透明度（0.0=透明〜1.0=不透明）
   "overlay_alpha": 0.5,
+  // 欠陥リファレンス画像の保存ディレクトリ
   "defect_library_dir": "Segmentation/defect_library",
+  // SAM3セグメンテーションの入力解像度（ピクセル）
   "sam3_resolution": 1008,
+  // リファレンス画像切り出し時の余白比率
+  "ref_padding_ratio": 0.1,
+  // 欠陥種別ごとの表示色 [R, G, B]
   "defect_colors": {
     "scratch": [255, 0, 0],
     "hole": [0, 255, 0],
@@ -14,6 +24,7 @@
     "dent": [255, 0, 255],
     "other": [128, 128, 128]
   },
+  // 欠陥種別の日本語表示名
   "defect_display_names": {
     "scratch": "傷",
     "hole": "穴",

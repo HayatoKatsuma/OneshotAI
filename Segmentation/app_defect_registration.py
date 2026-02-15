@@ -73,29 +73,15 @@ class DefectRegistrationApp:
         if self.camera_ready:
             return True
 
-        try:
-            import importlib.util
-            # ルートのutils.baumer_cameraをインポート（Segmentation/utilsとの名前衝突を回避）
-            spec = importlib.util.spec_from_file_location(
-                "baumer_camera", _project_root / "utils" / "baumer_camera.py"
-            )
-            baumer_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(baumer_module)
-            BaumerCamera = baumer_module.BaumerCamera
+        from utils.baumer_camera import BaumerCamera
 
-            print("カメラを初期化中...")
-            self.camera = BaumerCamera()
-            self.camera.apply_config(self.camera_params)
-            self.camera.cam.StartStreaming()
-            self.camera_ready = True
-            print("カメラ初期化完了")
-            return True
-
-        except Exception as e:
-            print(f"カメラ初期化エラー: {e}")
-            self.camera = None
-            self.camera_ready = False
-            return False
+        print("カメラを初期化中...")
+        self.camera = BaumerCamera()
+        self.camera.apply_config(self.camera_params)
+        self.camera.cam.StartStreaming()
+        self.camera_ready = True
+        print("カメラ初期化完了")
+        return True
 
     def _release_camera(self) -> None:
         """カメラを解放"""
@@ -113,7 +99,7 @@ class DefectRegistrationApp:
 
     def _load_json(self, filename: str, use_segmentation_cfg: bool = False) -> Dict:
         """
-        設定ファイル読み込み
+        設定ファイル読み込み（// コメント対応）
 
         Args:
             filename: ファイル名
@@ -124,7 +110,8 @@ class DefectRegistrationApp:
         if not path.exists():
             return {}
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            lines = [line for line in f if not line.strip().startswith("//")]
+            return json.loads("".join(lines))
 
     def _make_library_select_window(self) -> eg.Window:
         """ライブラリ選択画面"""
@@ -139,7 +126,7 @@ class DefectRegistrationApp:
                 eg.Button("選択", key="-SELECT_LIB-"),
                 eg.Button("新規作成", key="-NEW_LIB-"),
                 eg.Button("削除", key="-DELETE_LIB-"),
-                eg.Button("戻る", key="-BACK-"),
+                eg.Button("終了", key="-BACK-"),
             ],
         ]
 
@@ -206,7 +193,7 @@ class DefectRegistrationApp:
                 ]),
             ],
             [eg.HSeparator()],
-            [eg.Button("戻る", key="-BACK-")],
+            [eg.Button("終了", key="-BACK-")],
             [eg.Text("※ サンプル登録時に自動保存されます", font=("Arial", 10))],
         ]
 

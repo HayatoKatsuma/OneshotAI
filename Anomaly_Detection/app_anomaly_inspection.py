@@ -661,7 +661,11 @@ class AnomalyInspectionApp:
                 ),
             ],
             [eg.Text("手動: 待機中", key="-STATE-", font=("Arial", 24), text_color="gray")],
-            [eg.Text("閾値: - ", key="-THRESHOLD-", font=("Arial", 24), text_color="gray")],
+            [
+                eg.Text("閾値:", font=("Arial", 24)),
+                eg.Input("", key="-THRESHOLD_INPUT-", size=(10, 1), font=("Arial", 20)),
+                eg.Button("適用", key="-APPLY_THRESHOLD-", font=("Arial", 12)),
+            ],
             [eg.Text("結果: - ", key="-RESULT-", font=("Arial", 36))],
             [eg.HSeparator()],
             [   
@@ -794,9 +798,9 @@ class AnomalyInspectionApp:
 
         win["-RESULT-"].update(result_text, text_color=result_color)
 
-        # 閾値表示の更新
+        # 閾値入力欄を現在値で更新
         threshold = float(self.model_params.get("threshold", 0.0))
-        win["-THRESHOLD-"].update(f"閾値: {threshold:.3f}", text_color="gray")
+        win["-THRESHOLD_INPUT-"].update(f"{threshold:.3f}")
 
         if res == "NG":
             # NGの場合はブザー音を再生（別スレッドで非同期実行）
@@ -862,9 +866,9 @@ class AnomalyInspectionApp:
             win["-MASTER-"].update(data=self._to_png_bytes(self.master_padded))
             self.master_padded = None  # 次回以降スキップ
 
-        # 閾値の初期表示
+        # 閾値の初期表示（入力欄に現在値をセット）
         threshold = float(self.model_params.get("threshold", 0.0))
-        win["-THRESHOLD-"].update(f"閾値: {threshold:.3f}", text_color="gray")
+        win["-THRESHOLD_INPUT-"].update(f"{threshold:.3f}")
 
         # ----- ⑤ GUI イベントループ -----
         while True:
@@ -890,6 +894,21 @@ class AnomalyInspectionApp:
             # ----- トリガー設定 -----
             if ev == "-TRIGGER_SETTINGS-":
                 self._run_trigger_settings()
+
+            # ----- しきい値適用 -----
+            if ev == "-APPLY_THRESHOLD-":
+                raw = win["-THRESHOLD_INPUT-"].get().strip()
+                try:
+                    new_threshold = float(raw)
+                except ValueError:
+                    eg.popup_error(f"無効な値です: {raw}")
+                else:
+                    # メモリ上の値を更新（次回検査から反映）
+                    self.detector._threshold = new_threshold
+                    self.model_params["threshold"] = new_threshold
+                    # 設定ファイルに永続化
+                    base_threshold = float(self.base_model.get("threshold", 0.0))
+                    self._save_product_threshold(product, new_threshold, base_threshold)
 
             # ----- 撮像＆判定ボタン（手動モード時のみ）-----
             if ev == "-CAPTURE-" and not self.is_capturing and not self.trigger_mode:

@@ -20,7 +20,7 @@ from .defect_library import DefectLibrary
 # SAM3モジュールへのパスを追加
 _segmentation_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _segmentation_root not in sys.path:
-    sys.path.insert(0, _segmentation_root)
+    sys.path.append(_segmentation_root)
 
 
 def crop_horizontal_strip(
@@ -81,12 +81,14 @@ class DefectDetector:
         debug_save_dir: Optional[str] = None,
         nms_iou_threshold: float = 0.5,
         save_debug_images: bool = False,
+        ref_padding_ratio: float = 0.1,
     ):
         self.defect_library = defect_library
         self.device = device
         self.debug_save_dir = debug_save_dir
         self.nms_iou_threshold = nms_iou_threshold
         self.save_debug_images = save_debug_images
+        self.ref_padding_ratio = ref_padding_ratio
 
         if debug_save_dir and save_debug_images:
             os.makedirs(debug_save_dir, exist_ok=True)
@@ -208,7 +210,7 @@ class DefectDetector:
 
         # 参照画像をBBOXの横方向のみで切り出し（縦は全体を保持）
         reference_strip = crop_horizontal_strip(
-            reference_image, reference_bbox, padding_ratio=0.1
+            reference_image, reference_bbox, padding_ratio=self.ref_padding_ratio
         )
         ref_h, ref_w = reference_strip.shape[:2]
 

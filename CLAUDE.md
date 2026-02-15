@@ -111,3 +111,4 @@ LOCAL_UID=$(id -u) LOCAL_GID=$(id -g) docker compose run --rm anomaly-detection
 - 常に日本語で応答してください
 - コードのコメントも日本語で書いてください
 - エラーメッセージの説明も日本語でお願いします
+- コードを記述するときは、可能な限りtry/except文は使用しないようにしてください
